@@ -1,0 +1,8 @@
+i2cDeivces.c:47:10:convDecByteToHex	3
+i2cDeivces.c:78:8:i2cLIS3DH_presCheck	2
+i2cDeivces.c:92:8:i2cLIS3DH_init	11
+i2cDeivces.c:170:9:i2cLIS3DH_XYZ	1
+i2cDeivces.c:194:8:i2cLIS3DH_Temp	1
+i2cDeivces.c:203:6:RFID_LED	2
+i2cDeivces.c:215:8:RFID_readCard	7
+i2cDeivces.c:267:8:RFID_readFWVersion	6
