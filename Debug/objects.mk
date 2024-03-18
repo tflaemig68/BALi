@@ -5,5 +5,5 @@
 
 USER_OBJS :=
 
-LIBS := -l""
+LIBS := -lBalancer -lMCAL
 
