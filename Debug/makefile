@@ -59,11 +59,12 @@ all: main-build
 main-build: BALi.elf secondary-outputs
 
 dependents:
-	-cd D:/GITHUB/STM32/EDS_2023/Balancer/Debug && $(MAKE) all
+	-cd C:/GITHUB/STM32/EDS/Balancer/Debug && $(MAKE) all
+	-cd C:/GITHUB/STM32/EDS/MCAL/Debug && $(MAKE) all
 
 # Tool invocations
-BALi.elf BALi.map: $(OBJS) $(USER_OBJS) D:/GITHUB/STM32/EDS_2023/Balancer/Debug/libBalancer.a D:\GITHUB\STM32\EDS_2023\BALi\STM32F401RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "BALi.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"D:\GITHUB\STM32\EDS_2023\BALi\STM32F401RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="BALi.map" -Wl,--gc-sections -static -L"D:\GITHUB\STM32\EDS_2023\CMSIS\Debug" -L"D:\GITHUB\STM32\EDS_2023\MCAL_F40x\Debug" -L"D:\GITHUB\STM32\EDS_2023\Balancer\Debug" -L"D:\GITHUB\STM32\EDS_2023\Balancer\Debug\Src" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=softfp -mthumb -u _printf_float -Wl,--start-group -lc -lm -Wl,--end-group
+BALi.elf BALi.map: $(OBJS) $(USER_OBJS) C:/GITHUB/STM32/EDS/Balancer/Debug/libBalancer.a C:/GITHUB/STM32/EDS/MCAL/Debug/libMCAL.a C:\GITHUB\STM32\EDS\BALi\STM32F401RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "BALi.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\GITHUB\STM32\EDS\BALi\STM32F401RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="BALi.map" -Wl,--gc-sections -static -L"C:\GITHUB\STM32\EDS\MCAL\Debug" -L"C:\GITHUB\STM32\EDS\CMSIS\Debug" -L"C:\GITHUB\STM32\EDS\MCAL\Debug\Src" -L"C:\GITHUB\STM32\EDS\Balancer\Debug" -L"C:\GITHUB\STM32\EDS\Balancer\Debug\Src" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=softfp -mthumb -u _printf_float -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
@@ -92,6 +93,7 @@ warn-no-linker-script-specified:
 	@echo 'Warning: No linker script specified. Check the linker settings in the build configuration.'
 
 .PHONY: all clean dependents main-build fail-specified-linker-script-missing warn-no-linker-script-specified
-D:/GITHUB/STM32/EDS_2023/Balancer/Debug/libBalancer.a:
+C:/GITHUB/STM32/EDS/Balancer/Debug/libBalancer.a:
+C:/GITHUB/STM32/EDS/MCAL/Debug/libMCAL.a:
 
 -include ../makefile.targets

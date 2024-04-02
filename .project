@@ -4,6 +4,7 @@
 	<comment></comment>
 	<projects>
 		<project>Balancer</project>
+		<project>MCAL</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>

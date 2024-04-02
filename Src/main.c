@@ -8,8 +8,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
-
-#include <stm32f4xx.h>
+#include <math.h>
+//#include <stm32f4xx.h>
 
 #include <mcalSysTick.h>
 #include <mcalGPIO.h>
@@ -18,8 +18,8 @@
 #include <ST7735.h>
 #include <RotaryPushButton.h>
 #include <Balancer.h>
+#include <Sensor3DG.h>
 
-//#include "hw_config.h"
 
 #include "i2cDevices.h"
 #include "xyzScope.h"
@@ -51,8 +51,12 @@ int main(void)
 	uint8_t        scanAddr = 0x7F;  //7Bit Adresse
 	I2C_TypeDef   *i2c  = I2C1;
 	I2C_TypeDef   *i2c2  = I2C2;
-	int8_t ret;
+
+	int8_t BMA020ret = -1, LIS3DHret=-1, MPU6050ret=-1;
 	uint32_t   i2cTaskTime = 50UL;
+	bool LIS3DHenable = false;
+	bool BMA020enable = false;
+	bool MPU6050enable = false;
 
 /*  End I2C Variables  */
 
@@ -61,8 +65,8 @@ int main(void)
 
 
 	char strX[8],strY[8],strZ[8],strT[8];
-	int8_t Temp;
-	int16_t XYZraw[3];
+	int8_t Temp, XPOS;
+	int16_t XYZraw[3],XYZBMA[3],XYZMPU[3],XYZgMPU[3];
 	float XYZ[3], AlphaBeta[2];
 
 	static uint8_t testmode = 1;
@@ -78,29 +82,24 @@ int main(void)
 
 
     BalaHWsetup();
+    LED_red_on;
+
+	//Inits needed for TFT Display
+    // Initialisiert den Systick-Timer
+	systickInit(SYSTICK_1MS);
+	spiInit();
+	tftInitR(INITR_REDTAB);
+
+	//display setup
+    tftSetRotation(LANDSCAPE_FLIP);
+    tftSetFont((uint8_t *)&SmallFont[0]);
+    tftFillScreen(tft_BLACK);
 
     /* initialize the rotary push button module */
     initRotaryPushButton();
 
-
-    // Initialisiert den Systick-Timer
-    systickInit(SYSTICK_1MS);
-
     systickSetMillis(&I2C_Timer, i2cTaskTime);
-    //lcd7735_initR(0);
-    LED_red_on;
 
-    //lcd7735_setup();
-    //Inits needed for TFT Display
-
-    	spiInit();
-    	tftInitR(INITR_REDTAB);
-    //tftSetup();
-    //  tftInitR(INITR_REDTAB);
-
-    tftSetRotation(LANDSCAPE);
-    tftSetFont((uint8_t *)&SmallFont[0]);
-    tftFillScreen(tft_BLACK);
 
     LED_red_off;
 
@@ -154,11 +153,11 @@ int main(void)
 						   {
 							   enableLIDAR = true;
 							   //lcd7735_print((char *)"TOF/LIADR connected \0",0,28,0);
-							   break;
 						   }
+						   break;
 						   case i2cAddr_LIS3DH:
 						   {
-							   enableLIS3DH = true;
+							   LIS3DHenable = true;
 							   tftPrint((char *)"LIS3DH connected \0",0,28,0);
 
 							   tftPrint((char *)"Temp:\0",0,40,0);
@@ -166,23 +165,24 @@ int main(void)
 							   tftPrint((char *)"Y:\0",0,60,0);
 							   tftPrint((char *)"Z:\0",0,70,0);
 							   LED_blue_on;
-							   break;
 						   }
+						   break;
 						   case i2cAddr_BMA020:
 						   {
-							   enableBMA020 = true;
-							   tftPrint((char *)"BMA020 connected \0",0,28,0);
-
+							   BMA020enable = true;
+							   tftPrint((char *)"BMA020 \0",0,28,0);
 							   tftPrint((char *)"X:\0",0,50,0);
 							   tftPrint((char *)"Y:\0",0,60,0);
 							   tftPrint((char *)"Z:\0",0,70,0);
-							   LED_blue_on;
-							   testmode = 4;
-		 					   i2cTaskTime = 200;
-							   break;
 						   }
+						   break;
+						   case i2cAddr_MPU6050:
+						   {
+							   MPU6050enable = true;
+							   tftPrint((char *)"MPU6050 \0",65,28,0);
 
-
+						   }
+						   break;
 					   }
 				   }
 
@@ -193,8 +193,9 @@ int main(void)
 					   		// SL018 only works with 100kHz
 					   testmode = 2;
 				   }
-				   if ((scanAddr == 0) && (enableLIS3DH))
+				   if ((scanAddr == 0) && ((LIS3DHenable)|| (BMA020enable)||(MPU6050enable)))
 				   {
+					   LED_blue_on;
 					   scanAddr = 0x7F;
 					   testmode = 4;
 					   i2cTaskTime = 200;
@@ -244,49 +245,80 @@ int main(void)
 		   		}
 		   		break;
 
-// LIS3DH function
-		   	 	case 4:  // BMA020 Init		   			   		{
+// 3DG Sensor function
+		   	 	case 4:  // 3DGInit Init
 		   	 	{
-		   			LED_red_off;
-		   			//currentSensor = SENSOR_BMA020;
-		   			ret = i2cBMA020INIT(i2c, 0);
-		   	 		//i2cBMA020INIT(i2c, 0);
-					if (ret > 0)										// no LIS3DH Sensor present
+		   	 		LED_green_on;
+		   			if ((BMA020enable) && (BMA020ret < 0))
+		   			{
+		   				BMA020ret = i2cBMA020_init(i2c,0);
+		   			}
+		   			else
+		   			{ BMA020ret = 0; }
+		   			if ((MPU6050enable) && (MPU6050ret <0))
 					{
-						tftPrint("BMA020 not Present ",0,0,0);
+						MPU6050ret = i2cMPU6050_init(i2c,0);
+					}
+		   			else
+		   			{ MPU6050ret = 0; }
+
+					if (BMA020ret > 0)										// no LIS3DH Sensor present
+					{
+						tftPrint("no 3DGSensors Present ",0,0,0);
 						i2cTaskTime = 500;
 						testmode = 1;
 					}
-					if (ret == 0)										// LIS3DH init-procedure finished
+					if ((BMA020ret == 0)  && (MPU6050ret == 0))									// LIS3DH init-procedure finished
 					{
-						tftPrint("(C)24Fl I2C BMA020 ",0,0,0);
 						i2cTaskTime = 70;									// Tasktime for display 70ms
 						testmode = 5;
 						timeTMode5 = 100;							// count of cycles in Mode5
 					}
 				}
 				break;
-		   	 	case 5:  // read BMA020 Data
+		   	 	case 5:  // read 3DG Data
 				{
-					LED_blue_on;
+					LED_green_off;
+					LED_red_on;
+					if (BMA020enable)
+					{
+						i2cBMA020XYZ(i2c,(int16_t *) XYZBMA);
+						XPOS =15;
+						sprintf(strX, "%+5i", XYZBMA[2]); tftPrint((char *)strX,XPOS,50,0);
+						sprintf(strX, "%+5i", -XYZBMA[1]); tftPrint((char *)strX,XPOS,60,0);
+				//		sprintf(strX, "%+5i", XYZBMA[0]); tftPrint((char *)strX,XPOS,70,0);
+						AlphaBeta[0] =57* atan((float)-XYZBMA[1]/XYZBMA[2]);
+						sprintf(strX, "%+4.1f", AlphaBeta[0]); tftPrint((char *)strX,XPOS,80,0);
+					}
+					if (MPU6050enable)
+					{
+						i2cMPU6050XYZ(i2c,(int16_t *) XYZMPU);
+						XPOS =60;
+						const float MPU6050Res = 16.384;
+						sprintf(strX, "%+5.0f", XYZMPU[0]/MPU6050Res); tftPrint((char *)strX,XPOS,50,0);
+						sprintf(strX, "%+5.0f", XYZMPU[1]/MPU6050Res); tftPrint((char *)strX,XPOS,60,0);
+					//	sprintf(strX, "%+5.0f", XYZMPU[2]/MPU6050Res); tftPrint((char *)strX,XPOS,70,0);
+						AlphaBeta[1] =57* atan((float)XYZMPU[1]/XYZMPU[0]);
+						sprintf(strX, "%+4.1f", AlphaBeta[1]); tftPrint((char *)strX,XPOS,80,0);
 
-					i2cBMA020XYZ(i2c,(int16_t *) XYZraw);
-					//low_pass(XYZraw, XYZfilt, 10);
-					XYZ[0] = (float) XYZraw[0];  //skalierung 1mg/digit at +-2g
-					XYZ[1] = (float) XYZraw[1];
-					XYZ[2] = (float) XYZraw[2];
-					sprintf(strX, "%+6.0f", XYZ[0]);
-					tftPrint((char *)strX,20,50,0);
-					sprintf(strY, "%+6.0f", XYZ[1]);
-					tftPrint((char *)strY,20,60,0);
-					sprintf(strZ, "%+6.0f", XYZ[2]);
-					tftPrint((char *)strZ,20,70,0);
+						i2cMPU6050GYRO(i2c,(int16_t *) XYZgMPU);
+						XPOS =115;
+						const float MPU6050GyroRes = 131;
+						sprintf(strX, "%+4.0f", XYZgMPU[2]/MPU6050GyroRes); tftPrint((char *)strX,XPOS,70,0);
+				//		sprintf(strX, "%+4.0f", XYZgMPU[1]/MPU6050GyroRes); tftPrint((char *)strX,XPOS,60,0);
+				//		sprintf(strX, "%+4.0f", XYZgMPU[2]/MPU6050GyroRes); tftPrint((char *)strX,XPOS,70,0);
+
+
+					}
+
 					if ((timeTMode5--) > 0)
 					{
-						testmode = 5;
+						testmode = 8;
 						//tftPrint("T:    BMA020 (C)24Fl",0,0,0);
-						i2cTaskTime = 200;
+						i2cTaskTime = 20;
 						LED_blue_off;
+						LED_red_off;
+						tftFillScreen(tft_BLACK);
 
 					}
 		   	 	}
@@ -294,14 +326,14 @@ int main(void)
 		 	 	case 6:  // LIS3DH Init		   			   		{
 				{
 					LED_red_off;
-					int8_t ret = i2cLIS3DH_init(i2c, 0);
-					if (ret > 0)										// no LIS3DH Sensor present
+					LIS3DHret = i2cLIS3DH_init(i2c, 0);
+					if (LIS3DHret > 0)										// no LIS3DH Sensor present
 					{
 						tftPrint("LIS3DH not Present ",0,0,0);
 						i2cTaskTime = 500;
 						testmode = 1;
 					}
-					if (ret == 0)										// LIS3DH init-procedure finished
+					if (LIS3DHret == 0)										// LIS3DH init-procedure finished
 					{
 						tftPrint("(C)23Fl I2C LIS3DH ",0,0,0);
 						i2cTaskTime = 70;									// Tasktime for display 70ms
@@ -342,21 +374,34 @@ int main(void)
 				}
 		   		case 8:  // Scope display the LIS3DH Data
 				{
-					i2cLIS3DH_XYZ(i2c, XYZraw);
-
-					XYZ2AlphaBeta(XYZraw, AlphaBeta);
-					if (AlBeScreen(AlphaBeta) == 0)
+					if (BMA020enable)
 					{
-						Temp = i2cLIS3DH_Temp(i2c);
-						sprintf(strT, "%+3i", Temp);
-						tftPrint((char *)strT,12,0,0);
+						i2cBMA020XYZ(i2c,(int16_t *) XYZBMA);
+						AlphaBeta[0] = atan((float)-XYZBMA[1]/XYZBMA[2]);
 					}
-					//testmode = 2;
-					break;
-				}
+					if (MPU6050enable)
+					{
+						i2cMPU6050XYZ(i2c,(int16_t *) XYZMPU);
+						AlphaBeta[1] = atan((float)XYZMPU[1]/XYZMPU[0]);
+					}
 
-//end LIS3DH function
-		   	   default:
+					//i2cLIS3DH_XYZ(i2c, XYZraw);
+
+					if (fabs(AlphaBeta[1]) < 0.1)
+					{
+						setRotaryColor(LED_GREEN);
+					}
+					else
+					{
+						setRotaryColor(LED_YELLOW);
+					}
+					AlBeScreen(AlphaBeta);
+
+					//testmode = 2;
+
+				}
+				break;
+		   		default:
 				{
 					testmode = 0;
 				}

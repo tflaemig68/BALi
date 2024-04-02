@@ -7,7 +7,7 @@
 #include <mcalGPIO.h>
 #include <mcalI2C.h>
 #include <math.h>
-#include "ST7735.h"
+#include <ST7735.h>
 #include "xyzScope.h"
 
 
