@@ -14,6 +14,7 @@ Src/main.o: ../Src/main.c C:/GITHUB/STM32/EDS/MCAL/Inc/mcalSysTick.h \
  C:/GITHUB/STM32/EDS/Balancer/Inc/Balancer.h \
  C:/GITHUB/STM32/EDS/Balancer/Inc/RotaryPushButton.h \
  C:/GITHUB/STM32/EDS/Balancer/Inc/Sensor3DG.h \
+ C:/GITHUB/STM32/EDS/Balancer/Inc/step.h \
  C:/GITHUB/STM32/EDS/BALi/Inc/i2cDevices.h \
  C:/GITHUB/STM32/EDS/BALi/Inc/xyzScope.h
 C:/GITHUB/STM32/EDS/MCAL/Inc/mcalSysTick.h:
@@ -32,5 +33,6 @@ C:/GITHUB/STM32/EDS/Balancer/Inc/ST7735.h:
 C:/GITHUB/STM32/EDS/Balancer/Inc/Balancer.h:
 C:/GITHUB/STM32/EDS/Balancer/Inc/RotaryPushButton.h:
 C:/GITHUB/STM32/EDS/Balancer/Inc/Sensor3DG.h:
+C:/GITHUB/STM32/EDS/Balancer/Inc/step.h:
 C:/GITHUB/STM32/EDS/BALi/Inc/i2cDevices.h:
 C:/GITHUB/STM32/EDS/BALi/Inc/xyzScope.h:

@@ -19,11 +19,15 @@
 #include <RotaryPushButton.h>
 #include <Balancer.h>
 #include <Sensor3DG.h>
-
+#include <step.h>
 
 #include "i2cDevices.h"
 #include "xyzScope.h"
 
+#define i2cAddr_StepLeft 0x60
+#define i2cAddr_StepRight 0x61
+
+uint8_t Acc = 6;
 
 bool timerTrigger = false;
 
@@ -33,7 +37,7 @@ bool timerTrigger = false;
 uint32_t	Timer1 = 0UL;
 uint32_t    ST7735_Timer = 0UL;
 uint32_t    I2C_Timer = 0UL;
-//#define I2CTaskTime 20
+#define StepTaskTime 7
 
 
 /* Private function prototypes -----------------------------------------------*/
@@ -57,6 +61,8 @@ int main(void)
 	bool LIS3DHenable = false;
 	bool BMA020enable = false;
 	bool MPU6050enable = false;
+	bool StepLeftenable = false;
+	bool StepRightenable = false;
 
 /*  End I2C Variables  */
 
@@ -67,6 +73,9 @@ int main(void)
 	char strX[8],strY[8],strZ[8],strT[8];
 	int8_t Temp, XPOS;
 	int16_t XYZraw[3],XYZBMA[3],XYZMPU[3],XYZgMPU[3];
+	float MPUfilt[3], BMAfilt[3];
+	float orgkFilt = 0.02, kFilt;
+	int ButtPos, oldButtPos=0;
 	float XYZ[3], AlphaBeta[2];
 
 	static uint8_t testmode = 1;
@@ -104,7 +113,7 @@ int main(void)
     LED_red_off;
 
     tftPrint((char *)"I2C Scanner running \0",0,0,0);
-    tftPrint((char *)"Select I2C Connector \0",0,14,0);
+    //tftPrint((char *)"Select I2C Connector \0",0,14,0);
 
 
 
@@ -129,7 +138,7 @@ int main(void)
 		   	   case 0:  //I2C Scan
 		   	   {
 		   		   //lcd7735_setForeground(ST7735_YELLOW);
-		   		   i2cSetClkSpd(i2c,  I2C_CLOCK_400);
+		   		   i2cSetClkSpd(i2c,  I2C_CLOCK_100);
 		   		   i2cSetClkSpd(i2c2,  I2C_CLOCK_400);
 		   		   //tftPrint((char *)".  .  .  .  . \0",66,14,0);
 		   		   testmode  = 1;
@@ -142,13 +151,27 @@ int main(void)
 					   LED_red_off;
 					   switch (scanAddr)
 					   {
-						   case i2cAddr_RFID:
+					   	   case i2cAddr_StepLeft:
+						   {
+							   StepLeftenable = true;
+							   tftPrint((char *)"<-Left STEP\0",0,14,0);
+							   stepMotorInit(i2cAddr_StepLeft,1);
+						   }
+						   break;
+					   	   case i2cAddr_StepRight:
+						   {
+							   StepRightenable = true;
+							   tftPrint((char *)"Right->\0",92,14,0);
+							   stepMotorInit(i2cAddr_StepRight,0);
+						   }
+						   break;
+					   	   case i2cAddr_RFID:
 						   {
 							   enableRFID = true;
-							   tftPrint((char *)"RFID connected \0",0,28,0);
+							   tftPrint((char *)"RFID connected \0",0,56,0);
 							   RFID_LED(i2c,true);
-							   break;
 						   }
+						   break;
 						   case i2cAddr_LIDAR:
 						   {
 							   enableLIDAR = true;
@@ -170,7 +193,7 @@ int main(void)
 						   case i2cAddr_BMA020:
 						   {
 							   BMA020enable = true;
-							   tftPrint((char *)"BMA020 \0",0,28,0);
+							   tftPrint((char *)"BMA020 \0",0,42,0);
 							   tftPrint((char *)"X:\0",0,50,0);
 							   tftPrint((char *)"Y:\0",0,60,0);
 							   tftPrint((char *)"Z:\0",0,70,0);
@@ -179,7 +202,7 @@ int main(void)
 						   case i2cAddr_MPU6050:
 						   {
 							   MPU6050enable = true;
-							   tftPrint((char *)"MPU6050 \0",65,28,0);
+							   tftPrint((char *)"MPU6050 \0",65,42,0);
 
 						   }
 						   break;
@@ -268,11 +291,35 @@ int main(void)
 						i2cTaskTime = 500;
 						testmode = 1;
 					}
+
+
+
 					if ((BMA020ret == 0)  && (MPU6050ret == 0))									// LIS3DH init-procedure finished
 					{
-						i2cTaskTime = 70;									// Tasktime for display 70ms
-						testmode = 5;
-						timeTMode5 = 100;							// count of cycles in Mode5
+						if ((StepRightenable)&& (StepLeftenable))
+						{
+							setAccShape(i2cAddr_StepRight, 0);
+							setAcceleration(i2cAddr_StepRight, Acc);
+							//setIrun(i2cAddr_StepRight, Irun);
+							//setIhold(i2cAddr_StepRight, Ihold);
+
+							setAccShape(i2cAddr_StepLeft, 0);
+							setAcceleration(i2cAddr_StepLeft, Acc);
+							//setIrun(i2cAddr_StepLeft, Irun);
+							//setIhold(i2cAddr_StepLeft, Ihold);
+							i2cTaskTime = StepTaskTime;									// Tasktime for Stepper Balancing 70ms
+							testmode = 9;
+							tftFillScreen(tft_BLACK);
+							tftPrint("DHBW BALANCER (c)Fl\0",0,0,0);
+
+
+						}
+						else
+						{
+							i2cTaskTime = 70;									// Tasktime for display 70ms
+							testmode = 5;
+							timeTMode5 = 100;							// count of cycles in Mode5
+						}
 					}
 				}
 				break;
@@ -314,8 +361,7 @@ int main(void)
 					if ((timeTMode5--) > 0)
 					{
 						testmode = 8;
-						//tftPrint("T:    BMA020 (C)24Fl",0,0,0);
-						i2cTaskTime = 20;
+						i2cTaskTime = StepTaskTime;
 						LED_blue_off;
 						LED_red_off;
 						tftFillScreen(tft_BLACK);
@@ -366,7 +412,7 @@ int main(void)
 						testmode = 8;
 						tftFillScreen(tft_BLACK);
 						tftPrint("T:    LIS3DH (C)23Fl",0,0,0);
-						i2cTaskTime = 20;
+						i2cTaskTime = 100;
 						LED_blue_off;
 
 					}
@@ -395,7 +441,71 @@ int main(void)
 					{
 						setRotaryColor(LED_YELLOW);
 					}
+					AlphaBeta[0] *=10;
+					AlphaBeta[1] *=10;
 					AlBeScreen(AlphaBeta);
+
+
+
+					//testmode = 2;
+
+				}
+				break;
+		   		case 9:  // Scope display the LIS3DH Data
+				{
+					if (BMA020enable)
+					{
+						i2cBMA020XYZ(i2c,(int16_t *) XYZBMA);
+						getFiltertAccData(XYZBMA, BMAfilt, kFilt);
+						AlphaBeta[0] = atan((float)-BMAfilt[1]/BMAfilt[2]);
+					}
+					if (MPU6050enable)
+					{
+						i2cMPU6050XYZ(i2c,(int16_t *) XYZMPU);
+						getFiltertAccData(XYZMPU, MPUfilt, kFilt);
+						AlphaBeta[1] = atan((float)MPUfilt[1]/MPUfilt[0]);
+					}
+
+					//i2cLIS3DH_XYZ(i2c, XYZraw);
+
+					if (fabs(AlphaBeta[1]) < 0.1)
+					{
+						setRotaryColor(LED_GREEN);
+					}
+					else
+					{
+						setRotaryColor(LED_YELLOW);
+					}
+
+
+					int PosLeft = ((float)AlphaBeta[0]*573);
+					int PosRight = ((float)AlphaBeta[1]*573);
+					if (StepRightenable)
+					{
+						setPosition(i2cAddr_StepRight, PosRight);
+						StepRightenable = false;
+					}
+					else
+					{
+						setPosition(i2cAddr_StepLeft, PosLeft);
+						StepRightenable = true;
+					}
+
+					ButtPos = getRotaryPosition();
+					if (getRotaryPushButton())
+					{
+						tftPrintInt(ButtPos,120,20,0);
+					}
+
+					if (ButtPos != oldButtPos)
+					{
+						kFilt = orgkFilt+ ((float)ButtPos)/1000;
+						if (kFilt < 0.001) {kFilt = 0.001;}
+						if (kFilt > 1) {kFilt =1;}
+						sprintf(strX, "kFilt %4.3f\0", kFilt);
+						tftPrint((char *)strX,10,20,0);
+						oldButtPos = ButtPos;
+					}
 
 					//testmode = 2;
 
