@@ -1,2 +1,4 @@
-../Src/main.c:51:5:main	256	static
-../Src/main.c:534:9:I2C_SCAN	32	static
+../Src/main.c:52:5:main	280	static
+../Src/main.c:542:6:StepperIHold	24	static
+../Src/main.c:575:9:I2C_SCAN	32	static
+../Src/main.c:649:5:Regler	48	static

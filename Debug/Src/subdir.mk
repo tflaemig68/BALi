@@ -7,18 +7,21 @@
 C_SRCS += \
 ../Src/i2cDeivces.c \
 ../Src/main.c \
+../Src/regler.c \
 ../Src/system_stm32f4xx.c \
 ../Src/xyzScope.c 
 
 OBJS += \
 ./Src/i2cDeivces.o \
 ./Src/main.o \
+./Src/regler.o \
 ./Src/system_stm32f4xx.o \
 ./Src/xyzScope.o 
 
 C_DEPS += \
 ./Src/i2cDeivces.d \
 ./Src/main.d \
+./Src/regler.d \
 ./Src/system_stm32f4xx.d \
 ./Src/xyzScope.d 
 
@@ -30,7 +33,7 @@ Src/%.o Src/%.su Src/%.cyclo: ../Src/%.c Src/subdir.mk
 clean: clean-Src
 
 clean-Src:
-	-$(RM) ./Src/i2cDeivces.cyclo ./Src/i2cDeivces.d ./Src/i2cDeivces.o ./Src/i2cDeivces.su ./Src/main.cyclo ./Src/main.d ./Src/main.o ./Src/main.su ./Src/system_stm32f4xx.cyclo ./Src/system_stm32f4xx.d ./Src/system_stm32f4xx.o ./Src/system_stm32f4xx.su ./Src/xyzScope.cyclo ./Src/xyzScope.d ./Src/xyzScope.o ./Src/xyzScope.su
+	-$(RM) ./Src/i2cDeivces.cyclo ./Src/i2cDeivces.d ./Src/i2cDeivces.o ./Src/i2cDeivces.su ./Src/main.cyclo ./Src/main.d ./Src/main.o ./Src/main.su ./Src/regler.cyclo ./Src/regler.d ./Src/regler.o ./Src/regler.su ./Src/system_stm32f4xx.cyclo ./Src/system_stm32f4xx.d ./Src/system_stm32f4xx.o ./Src/system_stm32f4xx.su ./Src/xyzScope.cyclo ./Src/xyzScope.d ./Src/xyzScope.o ./Src/xyzScope.su
 
 .PHONY: clean-Src
 

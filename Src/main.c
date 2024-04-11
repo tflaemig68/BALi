@@ -24,8 +24,9 @@
 #include "i2cDevices.h"
 #include "xyzScope.h"
 
-#define i2cAddr_StepLeft 0x60
-#define i2cAddr_StepRight 0x61
+
+#define i2cAddr_motL 0x61
+#define i2cAddr_motR 0x60
 
 uint8_t Acc = 6;
 
@@ -45,8 +46,8 @@ void test_ascii_screen(void);
 void test_graphics(void);
 
 uint8_t I2C_SCAN(I2C_TypeDef *i2c, uint8_t scanAddr);
-
-
+void StepperIHold(bool on);
+int Regler(int Pos, float phi, float v);
 
 int main(void)
 {
@@ -70,12 +71,13 @@ int main(void)
 	char strFirmware[] = ". . .          \0";  // dummyString with NULL
 
 
-	char strX[8],strY[8],strZ[8],strT[8];
+	char strX[8],strY[8],strZ[8],strT[32];
 	int8_t Temp, XPOS;
 	int16_t XYZraw[3],XYZBMA[3],XYZMPU[3],XYZgMPU[3];
-	float MPUfilt[3], BMAfilt[3];
+	float MPUfilt[3] = {0,0,0}, BMAfilt[3]= {0,0,0};
 	float orgkFilt = 0.02, kFilt;
 	int ButtPos, oldButtPos=0;
+	int pos_motR=0, pos_motL=0;
 	float XYZ[3], AlphaBeta[2];
 
 	static uint8_t testmode = 1;
@@ -151,18 +153,18 @@ int main(void)
 					   LED_red_off;
 					   switch (scanAddr)
 					   {
-					   	   case i2cAddr_StepLeft:
+					   	   case i2cAddr_motL:
 						   {
 							   StepLeftenable = true;
 							   tftPrint((char *)"<-Left STEP\0",0,14,0);
-							   stepMotorInit(i2cAddr_StepLeft,1);
+							   stepMotorInit(i2cAddr_motL,1);
 						   }
 						   break;
-					   	   case i2cAddr_StepRight:
+					   	   case i2cAddr_motR:
 						   {
 							   StepRightenable = true;
 							   tftPrint((char *)"Right->\0",92,14,0);
-							   stepMotorInit(i2cAddr_StepRight,0);
+							   stepMotorInit(i2cAddr_motR,0);
 						   }
 						   break;
 					   	   case i2cAddr_RFID:
@@ -298,15 +300,15 @@ int main(void)
 					{
 						if ((StepRightenable)&& (StepLeftenable))
 						{
-							setAccShape(i2cAddr_StepRight, 0);
-							setAcceleration(i2cAddr_StepRight, Acc);
-							//setIrun(i2cAddr_StepRight, Irun);
-							//setIhold(i2cAddr_StepRight, Ihold);
+							setAccShape(i2cAddr_motR, 0);
+							setAcceleration(i2cAddr_motR, Acc);
+							//setIrun(i2cAddr_motR, Irun);
+							//setIhold(i2cAddr_motR, Ihold);
 
-							setAccShape(i2cAddr_StepLeft, 0);
-							setAcceleration(i2cAddr_StepLeft, Acc);
-							//setIrun(i2cAddr_StepLeft, Irun);
-							//setIhold(i2cAddr_StepLeft, Ihold);
+							setAccShape(i2cAddr_motL, 0);
+							setAcceleration(i2cAddr_motL, Acc);
+							//setIrun(i2cAddr_motL, Irun);
+							//setIhold(i2cAddr_motL, Ihold);
 							i2cTaskTime = StepTaskTime;									// Tasktime for Stepper Balancing 70ms
 							testmode = 9;
 							tftFillScreen(tft_BLACK);
@@ -451,7 +453,7 @@ int main(void)
 
 				}
 				break;
-		   		case 9:  // Scope display the LIS3DH Data
+		   		case 9:  // StepperPosition folgt dem Neigungswinkel
 				{
 					if (BMA020enable)
 					{
@@ -463,7 +465,7 @@ int main(void)
 					{
 						i2cMPU6050XYZ(i2c,(int16_t *) XYZMPU);
 						getFiltertAccData(XYZMPU, MPUfilt, kFilt);
-						AlphaBeta[1] = atan((float)MPUfilt[1]/MPUfilt[0]);
+						AlphaBeta[1] = atan(MPUfilt[1]/MPUfilt[0]);
 					}
 
 					//i2cLIS3DH_XYZ(i2c, XYZraw);
@@ -476,34 +478,50 @@ int main(void)
 					{
 						setRotaryColor(LED_YELLOW);
 					}
-
-
-					int PosLeft = ((float)AlphaBeta[0]*573);
-					int PosRight = ((float)AlphaBeta[1]*573);
-					if (StepRightenable)
+					if (fabs(AlphaBeta[1]) > 0.7)  //ca pi/4
 					{
-						setPosition(i2cAddr_StepRight, PosRight);
-						StepRightenable = false;
+						setRotaryColor(LED_MAGENTA);
+						StepperIHold(false);
+						softStop(i2cAddr_motR);
+						softStop(i2cAddr_motL);
+						resetPosition(i2cAddr_motR);
+						pos_motR = 0;
+						resetPosition(i2cAddr_motL);
+						pos_motL = 0;
 					}
 					else
 					{
-						setPosition(i2cAddr_StepLeft, PosLeft);
-						StepRightenable = true;
+						StepperIHold(true);
+						pos_motL =(int)(AlphaBeta[0]*573);
+						pos_motR =(int)(AlphaBeta[1]*573);
+						if (StepRightenable)
+						{
+							setPosition(i2cAddr_motR, pos_motR);
+							StepRightenable = false;
+						}
+						else
+						{
+							setPosition(i2cAddr_motL, pos_motL);
+							StepRightenable = true;
+						}
 					}
-
 					ButtPos = getRotaryPosition();
 					if (getRotaryPushButton())
 					{
 						tftPrintInt(ButtPos,120,20,0);
+						tftPrintFloat(AlphaBeta[0],0,34,0);
+						tftPrintFloat(AlphaBeta[1],100,34,0);
 					}
 
 					if (ButtPos != oldButtPos)
 					{
-						kFilt = orgkFilt+ ((float)ButtPos)/1000;
+						kFilt = orgkFilt+ ((float)ButtPos)/-500;
 						if (kFilt < 0.001) {kFilt = 0.001;}
 						if (kFilt > 1) {kFilt =1;}
-						sprintf(strX, "kFilt %4.3f\0", kFilt);
-						tftPrint((char *)strX,10,20,0);
+
+
+						sprintf(strT, "kFilt %5.3f ", kFilt);
+						tftPrint((char *)strT,10,20,0);
 						oldButtPos = ButtPos;
 					}
 
@@ -520,6 +538,29 @@ int main(void)
     } //end while
     return 0;
 }
+
+void StepperIHold(bool on)
+{
+	static bool status_off = false;
+	const uint8_t Ihold = 10;
+	const uint8_t Ioff = 0;
+	if (on == status_off)
+	{
+		if (on)
+		{
+			setIhold(i2cAddr_motL,Ihold);
+			setIhold(i2cAddr_motR,Ihold);
+		}
+		else
+		{
+			setIhold(i2cAddr_motL,Ioff);
+			setIhold(i2cAddr_motR,Ioff);
+		}
+	}
+
+}
+
+
 
 /* scanAdr. 7Bit Adresse value
  * return	0 if no device found on scanAdr
@@ -577,6 +618,42 @@ uint8_t I2C_SCAN(I2C_TypeDef *i2c, uint8_t scanAddr)
 	}
 	return foundAddr;
 
+}
+
+#define ParamCount 5
+struct Parameter
+{
+	char Title[5];
+	float Value;
+	float Min;
+	float Max;
+	float manInc;
+} Param[ParamCount];
+
+
+char ParamTitle[ParamCount][5] = {"Phi0","TP3dg","KP","KD","Rot"};
+//Param[0].Value = 0;
+
+
+
+struct RegPameter
+{
+	float phi_0;			// Winkel der neutralen Nulllage
+	float tp_3dg;			// Faktor des Tiefpass der Sensorwerte
+	float tp_tar;			// Tiefpass ??
+	float KP;				// Proportional Faktor [steps/phi]
+	float KD;				// Differential Faktor
+	float Rotation;			// Eigenrotatio Steps pro Zeitslot
+} RegPa;
+
+int Regler(int Pos, float phi, float v)
+{
+	static float phi_old =0;
+
+	float delta_phi = phi - RegPa.phi_0;
+	int _iTargetPos = (int)( RegPa.KP* delta_phi + (RegPa.KD* tan(phi - phi_old)));
+	phi_old = phi;
+	return (Pos+_iTargetPos);
 }
 
 /*
